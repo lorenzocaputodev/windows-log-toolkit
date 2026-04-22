@@ -220,3 +220,11 @@ You can easily adapt the scripts if you want to:
 - `.txt` extracts = **last 24 hours**
 - `.evtx` exports = **raw full exports available at run time**
 - cleanup = **attempts to clear all enumerated Event Viewer logs**
+
+---
+
+## 🤖 **Notes**
+
+This project was designed and refined by me, with targeted AI support in selected phases such as code review, refactoring, copy polishing, and visual or technical refinement.
+
+AI was used as a support tool, not as a substitute for my work. Direction, final decisions, validation, and overall quality were handled by me.
