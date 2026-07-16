@@ -1,8 +1,16 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 title Windows Event Logs Cleanup
 color 1F
+
+REM =========================================================
+REM Windows Event Logs Cleanup
+REM ---------------------------------------------------------
+REM - Run as Administrator
+REM - This script CLEARS Windows Event Viewer logs
+REM - A report is saved on the Desktop
+REM =========================================================
 
 call :RequireAdmin
 call :BuildTimestamp
@@ -11,6 +19,7 @@ call :ResolveOutputDir
 set "REPORT=%OUTDIR%\clean_logs_report_%STAMP%.txt"
 set /a OKCOUNT=0
 set /a FAILCOUNT=0
+set "MAKE_REPORT=1"
 
 echo =========================================================
 echo   WINDOWS EVENT LOGS CLEANUP
@@ -28,50 +37,80 @@ if errorlevel 2 (
     exit /b 0
 )
 
-> "%REPORT%" echo Windows Event Logs Cleanup Report
->>"%REPORT%" echo Generated: %DATE% %TIME%
->>"%REPORT%" echo Computer: %COMPUTERNAME%
->>"%REPORT%" echo User: %USERNAME%
->>"%REPORT%" echo Output directory: %OUTDIR%
->>"%REPORT%" echo.
+echo.
+choice /C YN /N /M "Save a report file on the Desktop? [Y/N]: "
+if errorlevel 2 (
+    set "MAKE_REPORT=0"
+) else (
+    set "MAKE_REPORT=1"
+)
+
+if "%MAKE_REPORT%"=="1" (
+    >"%REPORT%" echo Windows Event Logs Cleanup Report
+    >>"%REPORT%" echo Generated: %DATE% %TIME%
+    >>"%REPORT%" echo Computer: %COMPUTERNAME%
+    >>"%REPORT%" echo User: %USERNAME%
+    >>"%REPORT%" echo Output directory: %OUTDIR%
+    >>"%REPORT%" echo.
+)
 
 echo.
 echo Starting cleanup of all Windows Event Viewer logs...
-echo A detailed report will be saved to:
-echo %REPORT%
+if "%MAKE_REPORT%"=="1" (
+    echo A detailed report will be saved to:
+    echo %REPORT%
+) else (
+    echo No report file will be saved ^(skipped by user choice^).
+)
 echo.
 
-for /f "delims=" %%a in ('wevtutil el') do (
-    set "LOGNAME=%%a"
-    echo Cleaning log: "!LOGNAME!"
-    wevtutil cl "!LOGNAME!" >nul 2>&1
-
-    if !errorlevel! equ 0 (
-        echo   [OK]
-        set /a OKCOUNT+=1
-        >>"%REPORT%" echo [OK] !LOGNAME!
-    ) else (
-        echo   [FAILED]
-        set /a FAILCOUNT+=1
-        >>"%REPORT%" echo [FAILED] !LOGNAME!
+if "%MAKE_REPORT%"=="1" (
+    for /F "delims=" %%a in ('wevtutil el') do (
+        echo Cleaning log: "%%a"
+        wevtutil cl "%%a" >nul 2>&1 && (
+            echo   [OK]
+            set /a OKCOUNT+=1
+            echo [OK] %%a>>"%REPORT%"
+        ) || (
+            echo   [FAILED]
+            set /a FAILCOUNT+=1
+            echo [FAILED] %%a>>"%REPORT%"
+        )
+    )
+) else (
+    for /F "delims=" %%a in ('wevtutil el') do (
+        echo Cleaning log: "%%a"
+        wevtutil cl "%%a" >nul 2>&1 && (
+            echo   [OK]
+            set /a OKCOUNT+=1
+        ) || (
+            echo   [FAILED]
+            set /a FAILCOUNT+=1
+        )
     )
 )
 
->>"%REPORT%" echo.
->>"%REPORT%" echo Summary
->>"%REPORT%" echo -------
->>"%REPORT%" echo Logs cleaned successfully: !OKCOUNT!
->>"%REPORT%" echo Logs not cleaned: !FAILCOUNT!
+if "%MAKE_REPORT%"=="1" (
+    echo.>>"%REPORT%"
+    >>"%REPORT%" echo Summary
+    >>"%REPORT%" echo -------
+    >>"%REPORT%" echo Logs cleaned successfully: %OKCOUNT%
+    >>"%REPORT%" echo Logs not cleaned: %FAILCOUNT%
+)
 
 echo.
 echo =========================================================
 echo                         SUMMARY
 echo =========================================================
-echo Cleaned successfully: !OKCOUNT!
-echo Failed: !FAILCOUNT!
-echo Report: %REPORT%
+echo Cleaned successfully: %OKCOUNT%
+echo Failed: %FAILCOUNT%
+if "%MAKE_REPORT%"=="1" (
+    echo Report: %REPORT%
+) else (
+    echo Report: not created ^(skipped by user choice^)
+)
 echo.
-if !FAILCOUNT! GTR 0 (
+if %FAILCOUNT% GTR 0 (
     echo Note: Some logs may be protected, in use, or unavailable.
 ) else (
     echo All enumerated logs were cleared successfully.
