@@ -78,6 +78,8 @@ If the Desktop path can't be resolved (or doesn't exist), the script falls back 
 
 Both scripts resolve their output folder with `[Environment]::GetFolderPath('Desktop')` instead of a hardcoded `%USERPROFILE%\Desktop`. This is more reliable on setups where the Desktop has been redirected (e.g. OneDrive Known Folder Move) or on non-standard profiles. If the resolved path is empty or doesn't exist, the scripts fall back to the folder they're run from.
 
+Both the timestamp and the Desktop path are resolved together in a single PowerShell call (`:InitContext`), instead of two separate calls — this halves the PowerShell startup overhead each time a script runs.
+
 ### Tunable settings
 
 At the top of `extract_logs.bat` you can adjust two variables:

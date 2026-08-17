@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## [2.2.0] — 2026-08-17
+
+### Changed
+- Merged the timestamp and Desktop-path resolution into a single PowerShell call (`:InitContext`), replacing the two separate `:BuildTimestamp` and `:ResolveOutputDir` calls — halves PowerShell startup overhead on each run
+
 ## [2.1.0] — 2026-08-17
 
 ### Fixed

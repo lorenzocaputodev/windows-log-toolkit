@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 title Windows Logs Extractor
 color 1F
@@ -13,8 +13,7 @@ REM - Collects useful diagnostics before cleanup/troubleshooting
 REM =========================================================
 
 call :RequireAdmin
-call :BuildTimestamp
-call :ResolveOutputDir
+call :InitContext
 
 REM ---------------------------------------------------------
 REM Tunable settings (safe to adjust)
@@ -190,13 +189,16 @@ if not "%errorlevel%"=="0" (
 )
 exit /b 0
 
-:BuildTimestamp
-for /f %%i in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Date -Format yyyy-MM-dd_HH-mm-ss"') do set "STAMP=%%i"
+:InitContext
+set "STAMP="
+set "OUTDIR="
+set /a _LINE=0
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Date -Format yyyy-MM-dd_HH-mm-ss; [Environment]::GetFolderPath('Desktop')"`) do (
+    set /a _LINE+=1
+    if !_LINE! EQU 1 set "STAMP=%%i"
+    if !_LINE! EQU 2 set "OUTDIR=%%i"
+)
 if not defined STAMP set "STAMP=%DATE:/=-%_%TIME::=-%"
-exit /b 0
-
-:ResolveOutputDir
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[Environment]::GetFolderPath('Desktop')"`) do set "OUTDIR=%%i"
 if not defined OUTDIR set "OUTDIR=%~dp0"
 if not exist "%OUTDIR%" set "OUTDIR=%~dp0"
 if "%OUTDIR:~-1%"=="\" set "OUTDIR=%OUTDIR:~0,-1%"
