@@ -141,4 +141,5 @@ exit /b 0
 for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[Environment]::GetFolderPath('Desktop')"`) do set "OUTDIR=%%i"
 if not defined OUTDIR set "OUTDIR=%~dp0"
 if not exist "%OUTDIR%" set "OUTDIR=%~dp0"
+if "%OUTDIR:~-1%"=="\" set "OUTDIR=%OUTDIR:~0,-1%"
 exit /b 0

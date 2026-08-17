@@ -36,7 +36,7 @@ Run:
 extract_logs.bat
 ```
 
-Use this **before** clearing logs. See [Requirements](#️-requirements) for Administrator notes and [Recommended workflow](#-recommended-workflow) for the full sequence.
+Use this **before** clearing logs. See [Requirements](#-requirements) for Administrator notes and [Recommended workflow](#-recommended-workflow) for the full sequence.
 
 ### 2) Clean logs
 Run:
@@ -45,7 +45,7 @@ Run:
 clean_logs.bat
 ```
 
-Use only after you have saved what you need (see [Safety notes](#️-safety-notes)), and confirm the warning prompt before proceeding.
+Use only after you have saved what you need (see [Safety notes](#-safety-notes)), and confirm the warning prompt before proceeding.
 
 ---
 
@@ -182,7 +182,7 @@ Some logs may fail to clear because they are:
 
 ---
 
-## ⚠️ Safety notes
+## ⚠ Safety notes
 
 - `clean_logs.bat` is **destructive for Event Viewer history**
 - Always run `extract_logs.bat` first if there is any chance you will need those logs later
@@ -190,7 +190,7 @@ Some logs may fail to clear because they are:
 
 ---
 
-## ⚙️ Requirements
+## ⚙ Requirements
 
 - Windows
 - `cmd.exe`
@@ -202,7 +202,7 @@ These tools are normally present on standard Windows installations.
 
 ---
 
-## 🛠️ Customization ideas
+## 🛠 Customization ideas
 
 You can easily adapt the scripts if you want to:
 
@@ -219,5 +219,5 @@ You can easily adapt the scripts if you want to:
 
 - 🔎 `extract_logs.bat` = **collect first** — see [What it collects](#it-collects) and [Tunable settings](#tunable-settings)
 - 🧹 `clean_logs.bat` = **clear later if needed** — see [What it saves](#what-it-saves)
-- Safety and requirements — see [Safety notes](#️-safety-notes) and [Requirements](#️-requirements)
-- Want to adapt the scripts? — see [Customization ideas](#️-customization-ideas)
+- Safety and requirements — see [Safety notes](#-safety-notes) and [Requirements](#-requirements)
+- Want to adapt the scripts? — see [Customization ideas](#-customization-ideas)

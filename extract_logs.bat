@@ -59,54 +59,59 @@ echo %BASE_DIR%
 echo.
 
 echo [1/8] Extracting SYSTEM errors + warnings (last 24h)...
-wevtutil qe System /c:%MAX_EVENTS% /rd:true /f:text /q:"*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]" > "%BASE_DIR%\System_Errors_Warnings.txt" 2>nul && (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] System_Errors_Warnings.txt
-) || (
+wevtutil qe System /c:%MAX_EVENTS% /rd:true /f:text /q:"*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]" > "%BASE_DIR%\System_Errors_Warnings.txt" 2>nul
+if errorlevel 1 (
     echo   [FAILED]
     >>"%REPORT%" echo [FAILED] System_Errors_Warnings.txt
+) else (
+    echo   [OK]
+    >>"%REPORT%" echo [OK] System_Errors_Warnings.txt
 )
 echo.
 
 echo [2/8] Extracting APPLICATION errors + warnings (last 24h)...
-wevtutil qe Application /c:%MAX_EVENTS% /rd:true /f:text /q:"*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]" > "%BASE_DIR%\Application_Errors_Warnings.txt" 2>nul && (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] Application_Errors_Warnings.txt
-) || (
+wevtutil qe Application /c:%MAX_EVENTS% /rd:true /f:text /q:"*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]" > "%BASE_DIR%\Application_Errors_Warnings.txt" 2>nul
+if errorlevel 1 (
     echo   [FAILED]
     >>"%REPORT%" echo [FAILED] Application_Errors_Warnings.txt
+) else (
+    echo   [OK]
+    >>"%REPORT%" echo [OK] Application_Errors_Warnings.txt
 )
 echo.
 
 echo [3/8] Exporting raw System log (.evtx)...
-wevtutil epl System "%RAW_DIR%\System.evtx" >nul 2>&1 && (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] Raw_EVTX\System.evtx
-) || (
+wevtutil epl System "%RAW_DIR%\System.evtx" >nul 2>&1
+if errorlevel 1 (
     echo   [FAILED]
     >>"%REPORT%" echo [FAILED] Raw_EVTX\System.evtx
+) else (
+    echo   [OK]
+    >>"%REPORT%" echo [OK] Raw_EVTX\System.evtx
 )
 echo.
 
 echo [4/8] Exporting raw Application log (.evtx)...
-wevtutil epl Application "%RAW_DIR%\Application.evtx" >nul 2>&1 && (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] Raw_EVTX\Application.evtx
-) || (
+wevtutil epl Application "%RAW_DIR%\Application.evtx" >nul 2>&1
+if errorlevel 1 (
     echo   [FAILED]
     >>"%REPORT%" echo [FAILED] Raw_EVTX\Application.evtx
+) else (
+    echo   [OK]
+    >>"%REPORT%" echo [OK] Raw_EVTX\Application.evtx
 )
 echo.
 
 call :CopyDumps
 
 echo [6/8] Saving systeminfo...
-systeminfo > "%BASE_DIR%\systeminfo.txt" 2>nul && (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] systeminfo.txt
-) || (
+systeminfo > "%BASE_DIR%\systeminfo.txt" 2>nul
+if errorlevel 1 (
     echo   [FAILED]
     >>"%REPORT%" echo [FAILED] systeminfo.txt
+) else (
+    echo   [OK]
+    >>"%REPORT%" echo [OK] systeminfo.txt
 )
 echo.
 
@@ -126,12 +131,13 @@ if not errorlevel 1 (
 echo.
 
 echo [8/8] Saving running tasks...
-tasklist /v > "%BASE_DIR%\tasklist.txt" 2>nul && (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] tasklist.txt
-) || (
+tasklist /v > "%BASE_DIR%\tasklist.txt" 2>nul
+if errorlevel 1 (
     echo   [FAILED]
     >>"%REPORT%" echo [FAILED] tasklist.txt
+) else (
+    echo   [OK]
+    >>"%REPORT%" echo [OK] tasklist.txt
 )
 echo.
 
@@ -193,4 +199,5 @@ exit /b 0
 for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "[Environment]::GetFolderPath('Desktop')"`) do set "OUTDIR=%%i"
 if not defined OUTDIR set "OUTDIR=%~dp0"
 if not exist "%OUTDIR%" set "OUTDIR=%~dp0"
+if "%OUTDIR:~-1%"=="\" set "OUTDIR=%OUTDIR:~0,-1%"
 exit /b 0
