@@ -20,6 +20,8 @@ Each run uses its own timestamped folder/report, so previous results are never o
 ├─ extract_logs.bat
 ├─ clean_logs.bat
 ├─ README.md
+├─ CHANGELOG.md
+├─ LICENSE
 ├─ .gitignore
 └─ assets/
    └─ banner.svg
@@ -215,9 +217,16 @@ You can easily adapt the scripts if you want to:
 
 ---
 
+## 📄 License
+
+Released under the [MIT License](./LICENSE) — free to use, modify, and distribute, provided the copyright notice is kept.
+
+---
+
 ## 📌 Summary
 
 - 🔎 `extract_logs.bat` = **collect first** — see [What it collects](#it-collects) and [Tunable settings](#tunable-settings)
 - 🧹 `clean_logs.bat` = **clear later if needed** — see [What it saves](#what-it-saves)
 - Safety and requirements — see [Safety notes](#-safety-notes) and [Requirements](#-requirements)
 - Want to adapt the scripts? — see [Customization ideas](#-customization-ideas)
+- Version history — see [CHANGELOG.md](./CHANGELOG.md)
