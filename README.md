@@ -6,226 +6,106 @@
 
 [![Release](https://img.shields.io/github/v/release/lorenzocaputodev/windows-log-toolkit)](https://github.com/lorenzocaputodev/windows-log-toolkit/releases/latest) [![License](https://img.shields.io/github/license/lorenzocaputodev/windows-log-toolkit)](LICENSE) ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)
 
-A small Windows troubleshooting toolkit made of two batch scripts, for when Event Viewer data, crash dumps, driver lists, and system information are the first things you want to preserve before touching anything:
+Two batch scripts to preserve Windows diagnostic data before you start troubleshooting, and to clear Event Viewer history afterwards:
 
-- 🔎 **`extract_logs.bat`** — collects useful diagnostic data into a timestamped folder
-- 🧹 **`clean_logs.bat`** — clears Windows Event Viewer logs and can save a cleanup report
+- 🔎 **`extract_logs.bat`** — collects event logs, crash dumps, driver list and system info into a timestamped folder
+- 🧹 **`clean_logs.bat`** — clears Windows Event Viewer logs, with an optional report
 
-Each run uses its own timestamped folder/report, so previous results are never overwritten. See [Recommended workflow](#-recommended-workflow) for the intended extract-then-clean sequence.
+> [!WARNING]
+> `clean_logs.bat` permanently erases Event Viewer history. Run `extract_logs.bat` first if you might need those logs.
 
----
+## Quick start
 
-## 📦 Included files
+1. Download the latest version from the [Releases page](https://github.com/lorenzocaputodev/windows-log-toolkit/releases/latest), or clone the repository.
+2. Right click the script and choose **Run as administrator**.
+3. Run `extract_logs.bat` first, check the output folder, and run `clean_logs.bat` only if you really want to clear the logs.
 
-```text
-.
-├─ extract_logs.bat
-├─ clean_logs.bat
-├─ README.md
-├─ CHANGELOG.md
-├─ LICENSE
-├─ .gitignore
-└─ assets/
-   └─ banner.svg
-```
+Nothing is uploaded anywhere: both scripts only write files locally.
 
----
+## Requirements
 
-## 🚀 Quick start
+- Windows 10 or 11 with `cmd.exe`, `wevtutil` and PowerShell (all included by default)
+- **Administrator privileges** — both scripts check for them at startup and exit with an error message if missing
 
-Right click the script and choose **Run as administrator** (see [Requirements](#-requirements)).
+## `extract_logs.bat`
 
-### 1) Extract logs
+Creates a folder on your Desktop and fills it with the following:
 
-```bat
-extract_logs.bat
-```
+| Output | Content |
+|---|---|
+| `System_Errors_Warnings.txt` | System errors + warnings, last 24 hours, up to `MAX_EVENTS` entries |
+| `Application_Errors_Warnings.txt` | Application errors + warnings, last 24 hours, up to `MAX_EVENTS` entries |
+| `Raw_EVTX\System.evtx` | Full System log as available at that moment |
+| `Raw_EVTX\Application.evtx` | Full Application log as available at that moment |
+| `Dumps\*.dmp` | Minidumps from `%SystemRoot%\Minidump\`, if present |
+| `Dumps\MEMORY.DMP` | Full memory dump from `%SystemRoot%`, if present (can be several GB) |
+| `systeminfo.txt` | `systeminfo` output |
+| `driverquery.txt` | `driverquery` output (`/v` optional) |
+| `tasklist.txt` | `tasklist /v` output |
+| `collection_report.txt` | Outcome (`OK` / `FAILED`) of every step |
 
-Use this **before** clearing logs.
-
-### 2) Clean logs
-
-```bat
-clean_logs.bat
-```
-
-Use only after you have saved what you need (see [Safety notes](#-safety-notes)), and confirm the warning prompt before proceeding.
-
----
-
-## 🔎 What `extract_logs.bat` does
-
-The script resolves the current user's Desktop path and creates a timestamped output folder there:
+The readable `.txt` extracts are limited to the last 24 hours; the raw `.evtx` exports are not.
 
 ```text
-<Desktop>\windows_logs_YYYY-MM-DD_HH-mm-ss
-```
-
-If the Desktop path can't be resolved (or doesn't exist), the script prints a warning and falls back to the folder the script itself is running from — see [Output location](#output-location) below.
-
-### It collects
-
-- **System errors + warnings** (combined, last 24 hours)
-- **Application errors + warnings** (combined, last 24 hours)
-- Raw **`System.evtx`** export
-- Raw **`Application.evtx`** export
-- **Minidumps** from `%SystemRoot%\Minidump\` if present
-- **`MEMORY.DMP`** from `%SystemRoot%` if present (can be several GB)
-- **`systeminfo`** output
-- **`driverquery`** output (fast mode by default, `/v` optional — see [Tunable settings](#tunable-settings))
-- **`tasklist /v`** output
-- A plain text **collection report** with the outcome of every step
-
-### Output location
-
-Both scripts resolve their output folder with `[Environment]::GetFolderPath('Desktop')` instead of a hardcoded `%USERPROFILE%\Desktop`. This is more reliable on setups where the Desktop has been redirected (e.g. OneDrive Known Folder Move) or on non-standard profiles. If the resolved path is empty or doesn't exist, the scripts warn you and fall back to the folder they're run from.
-
-The timestamp and the Desktop path are resolved together in a single PowerShell call (`:InitContext`) to keep startup overhead low.
-
-### Tunable settings
-
-At the top of `extract_logs.bat` you can adjust two variables:
-
-```bat
-set "MAX_EVENTS=300"
-set "DRIVERQUERY_VERBOSE=0"
-```
-
-- `MAX_EVENTS` — max number of entries pulled per event query. Lower = faster, less history captured.
-- `DRIVERQUERY_VERBOSE` — set to `1` for the full `driverquery /v` (slower, more detail: digital signatures, driver paths, etc.), or leave at `0` for the fast version.
-
-Errors and warnings are combined into a single query per channel (2 queries total), which keeps the script quick.
-
-### Time window: `.txt` vs `.evtx`
-
-The readable `.txt` event extracts are limited to:
-- the **last 24 hours**
-- a capped number of entries per query
-
-The raw `.evtx` exports are different:
-- they are intended to preserve the **full exported channel content available at that moment**
-- they are **not limited to the last 24 hours** by the batch logic
-
-### Typical output structure
-
-```text
-windows_logs_2026-04-14_12-00-00/
+<Desktop>\windows_logs_YYYY-MM-DD_HH-mm-ss\
 ├─ Application_Errors_Warnings.txt
 ├─ System_Errors_Warnings.txt
 ├─ collection_report.txt
 ├─ driverquery.txt
 ├─ systeminfo.txt
 ├─ tasklist.txt
-├─ Dumps/
-│  ├─ *.dmp
-│  └─ MEMORY.DMP
-└─ Raw_EVTX/
-   ├─ Application.evtx
-   └─ System.evtx
+├─ Dumps\
+└─ Raw_EVTX\
 ```
 
----
+### Settings
 
-## 🧹 What `clean_logs.bat` does
+At the top of `extract_logs.bat`:
 
-The script enumerates Windows Event Viewer channels with `wevtutil el` and then tries to clear each one with `wevtutil cl`.
-
-### Full logs, not a time window
-
-This means the script attempts to clear **entire logs**, not just the last 24 hours.
-
-If a log is listed by `wevtutil el`, the script will try to clear it fully.
-
-### What it saves
-
-After confirming the cleanup, you are asked a second question:
-
-```text
-Save a report file? [Y/N]
+```bat
+set "MAX_EVENTS=300"
+set "DRIVERQUERY_VERBOSE=0"
 ```
 
-- **Y** — a timestamped report is saved (same [output location](#output-location) logic as `extract_logs.bat`):
-  ```text
-  <Desktop>\clean_logs_report_YYYY-MM-DD_HH-mm-ss.txt
-  ```
-- **N** — no report file is written; the cleanup still runs normally and the on-screen summary (cleaned/failed counts) is still shown at the end.
+- `MAX_EVENTS` — max entries per event query. Lower = faster, less history.
+- `DRIVERQUERY_VERBOSE` — `1` for full `driverquery /v` (slower; signatures, paths), `0` for the fast version.
 
-### Final result
+### Output location
 
-The script shows:
-- how many logs were cleared successfully
-- how many failed
-- where the report was saved
+Both scripts use `[Environment]::GetFolderPath('Desktop')` rather than a hardcoded `%USERPROFILE%\Desktop`, so redirected Desktops (e.g. OneDrive Known Folder Move) work. If the path can't be resolved, the scripts print a warning and use the folder they are run from. Each run gets its own timestamp, so previous results are never overwritten.
 
-### Notes
+## `clean_logs.bat`
 
-Some logs may fail to clear because they are:
-- protected
-- currently in use
-- unavailable on that system
+Enumerates every Event Viewer channel with `wevtutil el` and tries to clear it with `wevtutil cl`. It clears **entire logs**, not a time window.
 
----
+1. Confirm the warning prompt.
+2. Choose whether to save a report (`Save a report file? [Y/N]`):
+   - **Y** — saves `<Desktop>\clean_logs_report_YYYY-MM-DD_HH-mm-ss.txt` with the result of each log and a summary
+   - **N** — no file is written; the on-screen summary (cleaned / failed) is still shown
+3. Read the summary at the end.
 
-## ✅ Recommended workflow
+Some logs may fail to clear because they are protected, in use, or unavailable on that system. Windows also records the clearing itself (event 1102 in Security, 104 in System).
 
-1. Run **`extract_logs.bat`**
-2. Open the output folder and confirm files were created
-3. Archive or share the folder if needed (see [Safety notes](#-safety-notes) first)
-4. Run **`clean_logs.bat`** only if you intentionally want to clear Event Viewer history
+## Recommended workflow
 
-### Good use cases
+1. Run `extract_logs.bat`.
+2. Open the output folder and confirm the files were created.
+3. Archive or share the folder if needed (see below).
+4. Run `clean_logs.bat` only if you intentionally want to reset Event Viewer history.
 
-- Debugging blue screens or crashes
-- Preserving logs before cleanup
-- Collecting quick troubleshooting material for support chats or forums
-- Resetting Event Viewer history after saving the important data
+Typical uses: debugging blue screens and crashes, keeping evidence before a cleanup, gathering material for support requests.
 
----
+## Privacy
 
-## ⚠ Safety notes
+The extracted folder can contain **personal data**. Memory dumps, `.evtx` files, the process list and `systeminfo` can reveal user names, machine names, file paths and possibly memory contents. Review it before posting it publicly.
 
-- `clean_logs.bat` is **destructive for Event Viewer history**
-- Always run `extract_logs.bat` first if there is any chance you will need those logs later
-- The extracted folder can contain **personal data**: memory dumps, raw `.evtx` files, the process list and `systeminfo` reveal user names, machine names, file paths and possibly memory contents. Review it before posting it publicly
-- The toolkit does **not** upload anything anywhere — the scripts only save files locally on the machine where they are run
+## Customization
 
----
+- Time window: edit the `86400000` (milliseconds) value in the `:EventText` subroutine, e.g. `604800000` for 7 days.
+- More channels: add `call :EventText <channel>` or `call :ExportEvtx <channel>` lines.
+- More commands: add steps such as `ipconfig /all`, `dxdiag` or `Get-CimInstance` output. `wmic` is deprecated and missing on recent Windows 11 builds.
+- Different output folder: change `:InitContext`.
 
-## ⚙ Requirements
+## Changelog and license
 
-- Windows
-- `cmd.exe`
-- `wevtutil`
-- PowerShell available in the system
-- **Administrator privileges** — both scripts check for them at startup and exit with an error message if missing
-
-These tools are normally present on standard Windows installations.
-
----
-
-## 🛠 Customization ideas
-
-You can easily adapt the scripts if you want to:
-
-- change the time window from **24 hours** to **7 days** (edit the `86400000` milliseconds value in the `:EventText` subroutine)
-- export more channels than just `System` and `Application` (add `call :EventText <channel>` / `call :ExportEvtx <channel>` lines)
-- increase or decrease `MAX_EVENTS` in `extract_logs.bat`
-- set `DRIVERQUERY_VERBOSE=1` for full driver signature detail
-- collect additional commands such as `ipconfig /all`, `dxdiag`, or `Get-CimInstance` output (`wmic` is deprecated and missing on recent Windows 11 builds)
-- change `:InitContext` to always save somewhere other than the Desktop
-
----
-
-## 📄 License
-
-Released under the [MIT License](./LICENSE) — free to use, modify, and distribute, provided the copyright notice is kept.
-
----
-
-## 📌 Summary
-
-- 🔎 `extract_logs.bat` = **collect first** — see [What it collects](#it-collects) and [Tunable settings](#tunable-settings)
-- 🧹 `clean_logs.bat` = **clear later if needed** — see [What it saves](#what-it-saves)
-- Safety and requirements — see [Safety notes](#-safety-notes) and [Requirements](#-requirements)
-- Want to adapt the scripts? — see [Customization ideas](#-customization-ideas)
-- Version history — see [CHANGELOG.md](./CHANGELOG.md)
+Version history is in [CHANGELOG.md](./CHANGELOG.md). Released under the [MIT License](./LICENSE).
