@@ -4,6 +4,8 @@
 
 # Windows Log Toolkit
 
+[![Release](https://img.shields.io/github/v/release/lorenzocaputodev/windows-log-toolkit)](https://github.com/lorenzocaputodev/windows-log-toolkit/releases/latest) [![License](https://img.shields.io/github/license/lorenzocaputodev/windows-log-toolkit)](LICENSE) ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)
+
 A small Windows troubleshooting toolkit made of two batch scripts, for when Event Viewer data, crash dumps, driver lists, and system information are the first things you want to preserve before touching anything:
 
 - 🔎 **`extract_logs.bat`** — collects useful diagnostic data into a timestamped folder
