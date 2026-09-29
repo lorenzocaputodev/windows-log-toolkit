@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 title Windows Event Logs Cleanup
 color 1F
@@ -7,18 +7,17 @@ color 1F
 REM =========================================================
 REM Windows Event Logs Cleanup
 REM ---------------------------------------------------------
-REM - Run as Administrator
+REM - Run as Administrator (checked at startup)
 REM - This script CLEARS Windows Event Viewer logs
-REM - A report is saved on the Desktop
+REM - An optional report is saved on the Desktop
 REM =========================================================
 
-call :RequireAdmin
+call :RequireAdmin || exit /b 1
 call :InitContext
 
-set "REPORT=%OUTDIR%\clean_logs_report_%STAMP%.txt"
+set "REPORT=%OUTDIR%clean_logs_report_%STAMP%.txt"
 set /a OKCOUNT=0
 set /a FAILCOUNT=0
-set "MAKE_REPORT=1"
 
 echo =========================================================
 echo   WINDOWS EVENT LOGS CLEANUP
@@ -33,69 +32,51 @@ if errorlevel 2 (
     echo Operation cancelled by user.
     echo.
     pause
+    color
     exit /b 0
 )
 
 echo.
-choice /C YN /N /M "Save a report file on the Desktop? [Y/N]: "
+choice /C YN /N /M "Save a report file? [Y/N]: "
 if errorlevel 2 (
-    set "MAKE_REPORT=0"
+    REM Writing the report to NUL keeps a single cleanup loop for both cases
+    set "REPORT=NUL"
+    set "REPORT_INFO=not created (skipped by user choice)"
 ) else (
-    set "MAKE_REPORT=1"
+    set "REPORT_INFO=%REPORT%"
 )
 
-if "%MAKE_REPORT%"=="1" (
-    >"%REPORT%" echo Windows Event Logs Cleanup Report
-    >>"%REPORT%" echo Generated: %DATE% %TIME%
-    >>"%REPORT%" echo Computer: %COMPUTERNAME%
-    >>"%REPORT%" echo User: %USERNAME%
-    >>"%REPORT%" echo Output directory: %OUTDIR%
-    >>"%REPORT%" echo.
-)
+>"%REPORT%" echo Windows Event Logs Cleanup Report
+>>"%REPORT%" echo Generated: %DATE% %TIME%
+>>"%REPORT%" echo Computer: %COMPUTERNAME%
+>>"%REPORT%" echo User: %USERNAME%
+>>"%REPORT%" echo Output directory: %OUTDIR%
+>>"%REPORT%" echo.
 
 echo.
 echo Starting cleanup of all Windows Event Viewer logs...
-if "%MAKE_REPORT%"=="1" (
-    echo A detailed report will be saved to:
-    echo %REPORT%
-) else (
-    echo No report file will be saved ^(skipped by user choice^).
-)
+echo Report: %REPORT_INFO%
 echo.
 
-if "%MAKE_REPORT%"=="1" (
-    for /F "delims=" %%a in ('wevtutil el') do (
-        echo Cleaning log: "%%a"
-        wevtutil cl "%%a" >nul 2>&1 && (
-            echo   [OK]
-            set /a OKCOUNT+=1
-            echo [OK] %%a>>"%REPORT%"
-        ) || (
-            echo   [FAILED]
-            set /a FAILCOUNT+=1
-            echo [FAILED] %%a>>"%REPORT%"
-        )
-    )
-) else (
-    for /F "delims=" %%a in ('wevtutil el') do (
-        echo Cleaning log: "%%a"
-        wevtutil cl "%%a" >nul 2>&1 && (
-            echo   [OK]
-            set /a OKCOUNT+=1
-        ) || (
-            echo   [FAILED]
-            set /a FAILCOUNT+=1
-        )
+for /F "delims=" %%a in ('wevtutil el') do (
+    echo Cleaning log: "%%a"
+    wevtutil cl "%%a" >nul 2>&1
+    if errorlevel 1 (
+        echo   [FAILED]
+        set /a FAILCOUNT+=1
+        >>"%REPORT%" echo [FAILED] %%a
+    ) else (
+        echo   [OK]
+        set /a OKCOUNT+=1
+        >>"%REPORT%" echo [OK] %%a
     )
 )
 
-if "%MAKE_REPORT%"=="1" (
-    echo.>>"%REPORT%"
-    >>"%REPORT%" echo Summary
-    >>"%REPORT%" echo -------
-    >>"%REPORT%" echo Logs cleaned successfully: %OKCOUNT%
-    >>"%REPORT%" echo Logs not cleaned: %FAILCOUNT%
-)
+>>"%REPORT%" echo.
+>>"%REPORT%" echo Summary
+>>"%REPORT%" echo -------
+>>"%REPORT%" echo Logs cleaned successfully: %OKCOUNT%
+>>"%REPORT%" echo Logs not cleaned: %FAILCOUNT%
 
 echo.
 echo =========================================================
@@ -103,11 +84,7 @@ echo                         SUMMARY
 echo =========================================================
 echo Cleaned successfully: %OKCOUNT%
 echo Failed: %FAILCOUNT%
-if "%MAKE_REPORT%"=="1" (
-    echo Report: %REPORT%
-) else (
-    echo Report: not created ^(skipped by user choice^)
-)
+echo Report: %REPORT_INFO%
 echo.
 if %FAILCOUNT% GTR 0 (
     echo Note: Some logs may be protected, in use, or unavailable.
@@ -117,31 +94,50 @@ if %FAILCOUNT% GTR 0 (
 echo =========================================================
 echo.
 pause
+color
 exit /b 0
+
+REM ---------------------------------------------------------
+REM Subroutines
+REM ---------------------------------------------------------
 
 :RequireAdmin
 net session >nul 2>&1
-if not "%errorlevel%"=="0" (
+if errorlevel 1 (
     echo.
     echo [ERROR] Please run this script as Administrator.
     echo Right click the file and choose "Run as administrator".
     echo.
     pause
+    color
     exit /b 1
 )
 exit /b 0
 
 :InitContext
+REM Sets STAMP (yyyy-MM-dd_HH-mm-ss) and OUTDIR (Desktop, or the script
+REM folder as fallback, always with a trailing backslash) in one PowerShell call.
 set "STAMP="
 set "OUTDIR="
-set /a _LINE=0
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Date -Format yyyy-MM-dd_HH-mm-ss; [Environment]::GetFolderPath('Desktop')"`) do (
-    set /a _LINE+=1
-    if !_LINE! EQU 1 set "STAMP=%%i"
-    if !_LINE! EQU 2 set "OUTDIR=%%i"
+for /f "usebackq tokens=1,* delims=|" %%a in (`powershell -NoProfile -Command "(Get-Date -Format yyyy-MM-dd_HH-mm-ss) + '|' + [Environment]::GetFolderPath('Desktop')"`) do (
+    set "STAMP=%%a"
+    set "OUTDIR=%%b"
 )
-if not defined STAMP set "STAMP=%DATE:/=-%_%TIME::=-%"
-if not defined OUTDIR set "OUTDIR=%~dp0"
-if not exist "%OUTDIR%" set "OUTDIR=%~dp0"
-if "%OUTDIR:~-1%"=="\" set "OUTDIR=%OUTDIR:~0,-1%"
+if not defined STAMP call :FallbackStamp
+if defined OUTDIR if not exist "%OUTDIR%\" set "OUTDIR="
+if not defined OUTDIR (
+    set "OUTDIR=%~dp0"
+    echo [WARN] Desktop folder not resolved, using the script folder instead.
+    echo.
+)
+if not "%OUTDIR:~-1%"=="\" set "OUTDIR=%OUTDIR%\"
+exit /b 0
+
+:FallbackStamp
+set "STAMP=%DATE%_%TIME%"
+set "STAMP=%STAMP:/=-%"
+set "STAMP=%STAMP::=-%"
+set "STAMP=%STAMP: =0%"
+set "STAMP=%STAMP:,=-%"
+set "STAMP=%STAMP:.=-%"
 exit /b 0

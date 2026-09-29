@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 title Windows Logs Extractor
 color 1F
@@ -7,12 +7,12 @@ color 1F
 REM =========================================================
 REM Windows Logs Extractor
 REM ---------------------------------------------------------
-REM - Run as Administrator for best results
+REM - Run as Administrator (checked at startup)
 REM - Creates a timestamped folder on the Desktop
 REM - Collects useful diagnostics before cleanup/troubleshooting
 REM =========================================================
 
-call :RequireAdmin
+call :RequireAdmin || exit /b 1
 call :InitContext
 
 REM ---------------------------------------------------------
@@ -24,7 +24,7 @@ REM Set to 1 for full driverquery /v (slower, more detail)
 REM Set to 0 for fast driverquery (no /v, quicker, less detail)
 set "DRIVERQUERY_VERBOSE=0"
 
-set "BASE_DIR=%OUTDIR%\windows_logs_%STAMP%"
+set "BASE_DIR=%OUTDIR%windows_logs_%STAMP%"
 set "RAW_DIR=%BASE_DIR%\Raw_EVTX"
 set "DUMP_DIR=%BASE_DIR%\Dumps"
 set "REPORT=%BASE_DIR%\collection_report.txt"
@@ -36,6 +36,7 @@ if not exist "%BASE_DIR%" (
     echo %BASE_DIR%
     echo.
     pause
+    color
     exit /b 1
 )
 
@@ -58,60 +59,28 @@ echo %BASE_DIR%
 echo.
 
 echo [1/8] Extracting SYSTEM errors + warnings (last 24h)...
-wevtutil qe System /c:%MAX_EVENTS% /rd:true /f:text /q:"*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]" > "%BASE_DIR%\System_Errors_Warnings.txt" 2>nul
-if errorlevel 1 (
-    echo   [FAILED]
-    >>"%REPORT%" echo [FAILED] System_Errors_Warnings.txt
-) else (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] System_Errors_Warnings.txt
-)
+call :EventText System
 echo.
 
 echo [2/8] Extracting APPLICATION errors + warnings (last 24h)...
-wevtutil qe Application /c:%MAX_EVENTS% /rd:true /f:text /q:"*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]" > "%BASE_DIR%\Application_Errors_Warnings.txt" 2>nul
-if errorlevel 1 (
-    echo   [FAILED]
-    >>"%REPORT%" echo [FAILED] Application_Errors_Warnings.txt
-) else (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] Application_Errors_Warnings.txt
-)
+call :EventText Application
 echo.
 
 echo [3/8] Exporting raw System log (.evtx)...
-wevtutil epl System "%RAW_DIR%\System.evtx" >nul 2>&1
-if errorlevel 1 (
-    echo   [FAILED]
-    >>"%REPORT%" echo [FAILED] Raw_EVTX\System.evtx
-) else (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] Raw_EVTX\System.evtx
-)
+call :ExportEvtx System
 echo.
 
 echo [4/8] Exporting raw Application log (.evtx)...
-wevtutil epl Application "%RAW_DIR%\Application.evtx" >nul 2>&1
-if errorlevel 1 (
-    echo   [FAILED]
-    >>"%REPORT%" echo [FAILED] Raw_EVTX\Application.evtx
-) else (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] Raw_EVTX\Application.evtx
-)
+call :ExportEvtx Application
 echo.
 
+echo [5/8] Copying crash dumps...
 call :CopyDumps
+echo.
 
 echo [6/8] Saving systeminfo...
 systeminfo > "%BASE_DIR%\systeminfo.txt" 2>nul
-if errorlevel 1 (
-    echo   [FAILED]
-    >>"%REPORT%" echo [FAILED] systeminfo.txt
-) else (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] systeminfo.txt
-)
+call :Report %errorlevel% "systeminfo.txt"
 echo.
 
 echo [7/8] Saving driver list...
@@ -120,24 +89,12 @@ if "%DRIVERQUERY_VERBOSE%"=="1" (
 ) else (
     driverquery > "%BASE_DIR%\driverquery.txt" 2>nul
 )
-if not errorlevel 1 (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] driverquery.txt
-) else (
-    echo   [FAILED]
-    >>"%REPORT%" echo [FAILED] driverquery.txt
-)
+call :Report %errorlevel% "driverquery.txt"
 echo.
 
 echo [8/8] Saving running tasks...
 tasklist /v > "%BASE_DIR%\tasklist.txt" 2>nul
-if errorlevel 1 (
-    echo   [FAILED]
-    >>"%REPORT%" echo [FAILED] tasklist.txt
-) else (
-    echo   [OK]
-    >>"%REPORT%" echo [OK] tasklist.txt
-)
+call :Report %errorlevel% "tasklist.txt"
 echo.
 
 echo =========================================================
@@ -147,59 +104,97 @@ echo Files saved to:
 echo %BASE_DIR%
 echo Report:
 echo %REPORT%
+echo.
+echo Note: dumps and .evtx files may contain personal data.
+echo Review them before sharing.
 echo =========================================================
 echo.
 pause
+color
+exit /b 0
+
+REM ---------------------------------------------------------
+REM Subroutines
+REM ---------------------------------------------------------
+
+:EventText
+REM %1 = channel name (System / Application)
+wevtutil qe %1 /c:%MAX_EVENTS% /rd:true /f:text /q:"*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]" > "%BASE_DIR%\%1_Errors_Warnings.txt" 2>nul
+call :Report %errorlevel% "%1_Errors_Warnings.txt"
+exit /b 0
+
+:ExportEvtx
+REM %1 = channel name (System / Application)
+wevtutil epl %1 "%RAW_DIR%\%1.evtx" >nul 2>&1
+call :Report %errorlevel% "Raw_EVTX\%1.evtx"
 exit /b 0
 
 :CopyDumps
-echo [5/8] Copying crash dumps...
-set "FOUND_DUMP=0"
-
-if exist "C:\Windows\Minidump\*.dmp" (
-    copy "C:\Windows\Minidump\*.dmp" "%DUMP_DIR%\" >nul 2>&1
-    echo   [OK] Minidumps copied
-    >>"%REPORT%" echo [OK] Dumps\Minidump\*.dmp
-    set "FOUND_DUMP=1"
-)
-
-if exist "C:\Windows\MEMORY.DMP" (
-    copy "C:\Windows\MEMORY.DMP" "%DUMP_DIR%\" >nul 2>&1
-    echo   [OK] MEMORY.DMP copied
-    >>"%REPORT%" echo [OK] Dumps\MEMORY.DMP
-    set "FOUND_DUMP=1"
-)
-
-if "%FOUND_DUMP%"=="0" (
+set "FOUND_DUMP="
+if exist "%SystemRoot%\Minidump\*.dmp" call :CopyDump "%SystemRoot%\Minidump\*.dmp" "*.dmp"
+if exist "%SystemRoot%\MEMORY.DMP" call :CopyDump "%SystemRoot%\MEMORY.DMP" "MEMORY.DMP"
+if not defined FOUND_DUMP (
     echo   [INFO] No dump files found
     >>"%REPORT%" echo [INFO] No dump files found
 )
-echo.
+exit /b 0
+
+:CopyDump
+REM %1 = source path, %2 = label used in the report
+echo   Copying %~2 (may take a while for large dumps)...
+copy "%~1" "%DUMP_DIR%\" >nul 2>&1
+call :Report %errorlevel% "Dumps\%~2"
+set "FOUND_DUMP=1"
+exit /b 0
+
+:Report
+REM %1 = errorlevel of the previous step, %2 = label used in the report
+if "%~1"=="0" (
+    echo   [OK]
+    >>"%REPORT%" echo [OK] %~2
+) else (
+    echo   [FAILED]
+    >>"%REPORT%" echo [FAILED] %~2
+)
 exit /b 0
 
 :RequireAdmin
 net session >nul 2>&1
-if not "%errorlevel%"=="0" (
+if errorlevel 1 (
     echo.
     echo [ERROR] Please run this script as Administrator.
     echo Right click the file and choose "Run as administrator".
     echo.
     pause
+    color
     exit /b 1
 )
 exit /b 0
 
 :InitContext
+REM Sets STAMP (yyyy-MM-dd_HH-mm-ss) and OUTDIR (Desktop, or the script
+REM folder as fallback, always with a trailing backslash) in one PowerShell call.
 set "STAMP="
 set "OUTDIR="
-set /a _LINE=0
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Date -Format yyyy-MM-dd_HH-mm-ss; [Environment]::GetFolderPath('Desktop')"`) do (
-    set /a _LINE+=1
-    if !_LINE! EQU 1 set "STAMP=%%i"
-    if !_LINE! EQU 2 set "OUTDIR=%%i"
+for /f "usebackq tokens=1,* delims=|" %%a in (`powershell -NoProfile -Command "(Get-Date -Format yyyy-MM-dd_HH-mm-ss) + '|' + [Environment]::GetFolderPath('Desktop')"`) do (
+    set "STAMP=%%a"
+    set "OUTDIR=%%b"
 )
-if not defined STAMP set "STAMP=%DATE:/=-%_%TIME::=-%"
-if not defined OUTDIR set "OUTDIR=%~dp0"
-if not exist "%OUTDIR%" set "OUTDIR=%~dp0"
-if "%OUTDIR:~-1%"=="\" set "OUTDIR=%OUTDIR:~0,-1%"
+if not defined STAMP call :FallbackStamp
+if defined OUTDIR if not exist "%OUTDIR%\" set "OUTDIR="
+if not defined OUTDIR (
+    set "OUTDIR=%~dp0"
+    echo [WARN] Desktop folder not resolved, using the script folder instead.
+    echo.
+)
+if not "%OUTDIR:~-1%"=="\" set "OUTDIR=%OUTDIR%\"
+exit /b 0
+
+:FallbackStamp
+set "STAMP=%DATE%_%TIME%"
+set "STAMP=%STAMP:/=-%"
+set "STAMP=%STAMP::=-%"
+set "STAMP=%STAMP: =0%"
+set "STAMP=%STAMP:,=-%"
+set "STAMP=%STAMP:.=-%"
 exit /b 0
