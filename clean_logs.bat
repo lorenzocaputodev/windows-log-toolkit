@@ -18,6 +18,7 @@ call :InitContext
 set "REPORT=%OUTDIR%clean_logs_report_%STAMP%.txt"
 set /a OKCOUNT=0
 set /a FAILCOUNT=0
+set /a PROTCOUNT=0
 
 echo =========================================================
 echo   WINDOWS EVENT LOGS CLEANUP
@@ -71,7 +72,8 @@ call :MeasureFreed
 >>"%REPORT%" echo -------
 >>"%REPORT%" echo Logs cleaned successfully: %OKCOUNT%
 >>"%REPORT%" echo Logs already empty, skipped: %SKIPCOUNT%
->>"%REPORT%" echo Logs not cleaned: %FAILCOUNT%
+>>"%REPORT%" echo Logs protected by Windows, not clearable: %PROTCOUNT%
+>>"%REPORT%" echo Logs not cleaned because of an error: %FAILCOUNT%
 >>"%REPORT%" echo Space freed: %FREED_INFO%
 
 echo.
@@ -80,14 +82,16 @@ echo                         SUMMARY
 echo =========================================================
 echo Cleaned successfully: %OKCOUNT%
 echo Already empty, skipped: %SKIPCOUNT%
+echo Protected by Windows: %PROTCOUNT%
 echo Failed: %FAILCOUNT%
 echo Space freed: %FREED_INFO%
 echo Report: %REPORT_INFO%
 echo.
+if %PROTCOUNT% GTR 0 echo Protected logs only allow reading, even for Administrators: this is normal.
 if %FAILCOUNT% GTR 0 (
-    echo Note: Some logs may be protected, in use, or unavailable.
+    echo Note: Some logs failed: they may be in use or unavailable.
 ) else (
-    echo All enumerated logs were cleared successfully.
+    echo Every log that Windows allows clearing was cleared.
 )
 echo =========================================================
 echo.
@@ -110,12 +114,13 @@ set "BEFORE_MB=-1"
 set "HEADER="
 powershell -NoProfile -Command "$info = @{}; Get-WinEvent -ListLog * -Force -ErrorAction SilentlyContinue | ForEach-Object { $info[$_.LogName] = $_ }; $skip = 0; $names = foreach ($n in (wevtutil el)) { if ($info[$n] -and $info[$n].RecordCount -eq 0) { $skip++ } else { $n } }; $mb = [math]::Round(($info.Values | Measure-Object FileSize -Sum).Sum / 1MB); '*' + $skip + '|' + $mb; $names" > "%LOGLIST%" 2>nul
 set /p HEADER=<"%LOGLIST%"
-if not "%HEADER:~0,1%"=="*" (
-    echo [WARN] Could not check which logs are empty, trying all of them.
-    >"%LOGLIST%" echo *0^|-1
-    wevtutil el >>"%LOGLIST%"
-    set "HEADER=*0|-1"
-)
+if not defined HEADER set "HEADER=-"
+if "%HEADER:~0,1%"=="*" goto :BuildLogListHeader
+echo [WARN] Could not check which logs are empty, trying all of them.
+>"%LOGLIST%" echo *0^|-1
+wevtutil el >>"%LOGLIST%"
+set "HEADER=*0|-1"
+:BuildLogListHeader
 for /f "tokens=1,2 delims=*|" %%a in ("%HEADER%") do (
     set "SKIPCOUNT=%%a"
     set "BEFORE_MB=%%b"
@@ -128,9 +133,12 @@ REM %1 = log name
 echo Cleaning log: "%~1"
 wevtutil cl "%~1" >nul 2>&1
 if not errorlevel 1 goto :CleanLogOk
+wevtutil gl "%~1" >"%LOGINFO%" 2>nul || goto :CleanLogFailed
+call :IsProtectedLog
+if not errorlevel 1 goto :CleanLogProtected
 REM Enabled Analytic/Debug logs can only be cleared while disabled:
 REM disable, clear, then enable again.
-call :IsEnabledDirectLog "%~1"
+call :IsEnabledDirectLog
 if errorlevel 1 goto :CleanLogFailed
 wevtutil sl "%~1" /e:false /q:true >nul 2>&1
 wevtutil cl "%~1" >nul 2>&1
@@ -151,10 +159,22 @@ echo   [FAILED]
 set /a FAILCOUNT+=1
 >>"%REPORT%" echo [FAILED] %~1
 exit /b 0
+:CleanLogProtected
+echo   [PROTECTED] Windows does not allow clearing this log
+set /a PROTCOUNT+=1
+>>"%REPORT%" echo [PROTECTED] %~1
+exit /b 0
+
+:IsProtectedLog
+REM Reads LOGINFO ("wevtutil gl" output). Exit code 0 when the log's
+REM permissions (channelAccess) don't let the current user clear it.
+REM Any error counts as "not protected", so the log is reported as failed.
+powershell -NoProfile -Command "$a = (Get-Content -LiteralPath $env:LOGINFO | Where-Object { $_ -like 'channelAccess: *' }) -replace '^channelAccess: ', ''; $id = [Security.Principal.WindowsIdentity]::GetCurrent(); $mine = @($id.User.Value) + @($id.Groups | ForEach-Object { $_.Value }); $sd = [Security.AccessControl.RawSecurityDescriptor]::new([string]$a); $can = $sd.DiscretionaryAcl | Where-Object { $_.AceQualifier -eq 'AccessAllowed' -and $mine -contains $_.SecurityIdentifier.Value -and ($_.AccessMask -band 0x50000004) }; if ($can) { exit 1 } else { exit 0 }" >nul 2>&1
+exit /b %errorlevel%
 
 :IsEnabledDirectLog
-REM %1 = log name. Exit code 0 when it is an enabled Analytic or Debug log.
-wevtutil gl "%~1" >"%LOGINFO%" 2>nul || exit /b 1
+REM Reads LOGINFO ("wevtutil gl" output). Exit code 0 when it is an
+REM enabled Analytic or Debug log.
 findstr /r /c:"^type: Analytic" /c:"^type: Debug" "%LOGINFO%" >nul || exit /b 1
 findstr /r /c:"^enabled: true" "%LOGINFO%" >nul || exit /b 1
 exit /b 0

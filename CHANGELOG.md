@@ -11,7 +11,8 @@ All notable changes to this project are documented here.
 - `extract_logs.bat`: new outputs: Setup log (`.txt` + `.evtx`), Live Kernel Reports, Windows Error Reporting reports, `ipconfig /all`, installed updates, disk health
 - `extract_logs.bat`: each result line names its item, and the final screen shows how many items failed
 - `clean_logs.bat`: enabled Analytic/Debug logs, which can't be cleared while enabled, are disabled, cleared and enabled again
-- `clean_logs.bat`: the summary also shows the logs skipped because already empty and about how much disk space was freed
+- `clean_logs.bat`: logs whose permissions don't allow clearing, even for Administrators, are reported as `[PROTECTED]` instead of `[FAILED]`
+- `clean_logs.bat`: the summary also shows the logs skipped because already empty, the protected ones, and about how much disk space was freed
 - `.gitattributes` keeps Windows line endings in the `.bat` files, which `cmd.exe` needs to find labels reliably
 
 ### Changed
