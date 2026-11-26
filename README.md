@@ -91,13 +91,16 @@ Both scripts use `[Environment]::GetFolderPath('Desktop')` rather than a hardcod
 
 ## `clean_logs.bat`
 
-Enumerates every Event Viewer channel with `wevtutil el` and tries to clear it with `wevtutil cl`. It clears **entire logs**, not a time window.
+Enumerates every Event Viewer channel with `wevtutil el` and clears it with `wevtutil cl`. It clears **entire logs**, not a time window.
+
+- Logs that are already empty are skipped (there is nothing to clear), so a run is much faster than trying 1000+ channels one by one. Logs whose event count can't be read are always tried.
+- Enabled Analytic and Debug logs can only be cleared while disabled: when clearing one of them fails, the script disables it, clears it and enables it again. If it can't be enabled again, the report says so with a `[WARN]` line.
 
 1. Confirm the warning prompt.
 2. Choose whether to save a report (`Save a report file? [Y/N]`):
    - **Y** — saves `<Desktop>\clean_logs_report_YYYY-MM-DD_HH-mm-ss.txt` with the result of each log and a summary
-   - **N** — no file is written; the on-screen summary (cleaned / failed) is still shown
-3. Read the summary at the end.
+   - **N** — no file is written; the on-screen summary is still shown
+3. Read the summary at the end: logs cleaned, already empty, failed, and about how much disk space was freed.
 
 Some logs may fail to clear because they are protected, in use, or unavailable on that system. Windows also records the clearing itself (event 1102 in Security, 104 in System).
 

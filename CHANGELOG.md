@@ -10,9 +10,12 @@ All notable changes to this project are documented here.
 - `extract_logs.bat`: `FULL_DUMP` setting (`ask` / `yes` / `no`) for `MEMORY.DMP`; with `ask` the size is shown and the choice is made before the long steps start, and the copy is skipped if it would leave less than 1 GB free
 - `extract_logs.bat`: new outputs: Setup log (`.txt` + `.evtx`), Live Kernel Reports, Windows Error Reporting reports, `ipconfig /all`, installed updates, disk health
 - `extract_logs.bat`: each result line names its item, and the final screen shows how many items failed
+- `clean_logs.bat`: enabled Analytic/Debug logs, which can't be cleared while enabled, are disabled, cleared and enabled again
+- `clean_logs.bat`: the summary also shows the logs skipped because already empty and about how much disk space was freed
 - `.gitattributes` keeps Windows line endings in the `.bat` files, which `cmd.exe` needs to find labels reliably
 
 ### Changed
+- `clean_logs.bat` skips logs that are already empty instead of running `wevtutil cl` on every channel (1000+ on a typical system), which made it slow and inflated the failure count
 - The Administrator check uses `fltmc` instead of `net session`, which fails on systems where the Server service is disabled
 
 ## [2.2.1] — 2026-09-29

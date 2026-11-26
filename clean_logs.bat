@@ -57,33 +57,31 @@ echo.
 echo Starting cleanup of all Windows Event Viewer logs...
 echo Report: %REPORT_INFO%
 echo.
+echo Looking for logs that contain events...
+call :BuildLogList
 
-for /F "delims=" %%a in ('wevtutil el') do (
-    echo Cleaning log: "%%a"
-    wevtutil cl "%%a" >nul 2>&1
-    if errorlevel 1 (
-        echo   [FAILED]
-        set /a FAILCOUNT+=1
-        >>"%REPORT%" echo [FAILED] %%a
-    ) else (
-        echo   [OK]
-        set /a OKCOUNT+=1
-        >>"%REPORT%" echo [OK] %%a
-    )
-)
+set "LOGINFO=%TEMP%\clean_logs_info_%STAMP%.txt"
+for /f "usebackq skip=1 delims=" %%a in ("%LOGLIST%") do call :CleanLog "%%a"
+del "%LOGLIST%" "%LOGINFO%" 2>nul
+
+call :MeasureFreed
 
 >>"%REPORT%" echo.
 >>"%REPORT%" echo Summary
 >>"%REPORT%" echo -------
 >>"%REPORT%" echo Logs cleaned successfully: %OKCOUNT%
+>>"%REPORT%" echo Logs already empty, skipped: %SKIPCOUNT%
 >>"%REPORT%" echo Logs not cleaned: %FAILCOUNT%
+>>"%REPORT%" echo Space freed: %FREED_INFO%
 
 echo.
 echo =========================================================
 echo                         SUMMARY
 echo =========================================================
 echo Cleaned successfully: %OKCOUNT%
+echo Already empty, skipped: %SKIPCOUNT%
 echo Failed: %FAILCOUNT%
+echo Space freed: %FREED_INFO%
 echo Report: %REPORT_INFO%
 echo.
 if %FAILCOUNT% GTR 0 (
@@ -100,6 +98,78 @@ exit /b 0
 REM ---------------------------------------------------------
 REM Subroutines
 REM ---------------------------------------------------------
+
+:BuildLogList
+REM Writes LOGLIST: a header line "*<empty logs>|<MB used by all logs>",
+REM then every log that has events or whose event count can't be read.
+REM Empty logs are left out: there is nothing to clear in them.
+REM If PowerShell fails, every log from "wevtutil el" is listed instead.
+set "LOGLIST=%TEMP%\clean_logs_list_%STAMP%.txt"
+set "SKIPCOUNT=0"
+set "BEFORE_MB=-1"
+set "HEADER="
+powershell -NoProfile -Command "$info = @{}; Get-WinEvent -ListLog * -Force -ErrorAction SilentlyContinue | ForEach-Object { $info[$_.LogName] = $_ }; $skip = 0; $names = foreach ($n in (wevtutil el)) { if ($info[$n] -and $info[$n].RecordCount -eq 0) { $skip++ } else { $n } }; $mb = [math]::Round(($info.Values | Measure-Object FileSize -Sum).Sum / 1MB); '*' + $skip + '|' + $mb; $names" > "%LOGLIST%" 2>nul
+set /p HEADER=<"%LOGLIST%"
+if not "%HEADER:~0,1%"=="*" (
+    echo [WARN] Could not check which logs are empty, trying all of them.
+    >"%LOGLIST%" echo *0^|-1
+    wevtutil el >>"%LOGLIST%"
+    set "HEADER=*0|-1"
+)
+for /f "tokens=1,2 delims=*|" %%a in ("%HEADER%") do (
+    set "SKIPCOUNT=%%a"
+    set "BEFORE_MB=%%b"
+)
+echo.
+exit /b 0
+
+:CleanLog
+REM %1 = log name
+echo Cleaning log: "%~1"
+wevtutil cl "%~1" >nul 2>&1
+if not errorlevel 1 goto :CleanLogOk
+REM Enabled Analytic/Debug logs can only be cleared while disabled:
+REM disable, clear, then enable again.
+call :IsEnabledDirectLog "%~1"
+if errorlevel 1 goto :CleanLogFailed
+wevtutil sl "%~1" /e:false /q:true >nul 2>&1
+wevtutil cl "%~1" >nul 2>&1
+set "CL_RESULT=%errorlevel%"
+wevtutil sl "%~1" /e:true /q:true >nul 2>&1
+if not errorlevel 1 goto :CleanLogRetried
+echo   [WARN] Could not enable the log again
+>>"%REPORT%" echo [WARN] %~1 was left disabled: could not enable it again
+:CleanLogRetried
+if not "%CL_RESULT%"=="0" goto :CleanLogFailed
+:CleanLogOk
+echo   [OK]
+set /a OKCOUNT+=1
+>>"%REPORT%" echo [OK] %~1
+exit /b 0
+:CleanLogFailed
+echo   [FAILED]
+set /a FAILCOUNT+=1
+>>"%REPORT%" echo [FAILED] %~1
+exit /b 0
+
+:IsEnabledDirectLog
+REM %1 = log name. Exit code 0 when it is an enabled Analytic or Debug log.
+wevtutil gl "%~1" >"%LOGINFO%" 2>nul || exit /b 1
+findstr /r /c:"^type: Analytic" /c:"^type: Debug" "%LOGINFO%" >nul || exit /b 1
+findstr /r /c:"^enabled: true" "%LOGINFO%" >nul || exit /b 1
+exit /b 0
+
+:MeasureFreed
+REM Sets FREED_INFO from the total log size before and after the cleanup.
+set "FREED_INFO=unknown"
+if "%BEFORE_MB%"=="-1" exit /b 0
+set "AFTER_MB="
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "[math]::Round((Get-WinEvent -ListLog * -Force -ErrorAction SilentlyContinue | Measure-Object FileSize -Sum).Sum / 1MB)"`) do set "AFTER_MB=%%a"
+if not defined AFTER_MB exit /b 0
+set /a FREED_MB=BEFORE_MB-AFTER_MB
+if %FREED_MB% LSS 0 set /a FREED_MB=0
+set "FREED_INFO=about %FREED_MB% MB"
+exit /b 0
 
 :RequireAdmin
 REM %1 = this script's full path, %2 = "elevated" when relaunched by this routine
