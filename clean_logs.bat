@@ -7,12 +7,12 @@ color 1F
 REM =========================================================
 REM Windows Event Logs Cleanup
 REM ---------------------------------------------------------
-REM - Run as Administrator (checked at startup)
+REM - Needs Administrator rights (asks for them if missing)
 REM - This script CLEARS Windows Event Viewer logs
 REM - An optional report is saved on the Desktop
 REM =========================================================
 
-call :RequireAdmin || exit /b 1
+call :RequireAdmin "%~f0" %1 || exit /b 1
 call :InitContext
 
 set "REPORT=%OUTDIR%clean_logs_report_%STAMP%.txt"
@@ -102,17 +102,24 @@ REM Subroutines
 REM ---------------------------------------------------------
 
 :RequireAdmin
-net session >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Please run this script as Administrator.
-    echo Right click the file and choose "Run as administrator".
-    echo.
-    pause
-    color
-    exit /b 1
-)
-exit /b 0
+REM %1 = this script's full path, %2 = "elevated" when relaunched by this routine
+fltmc >nul 2>&1
+if not errorlevel 1 exit /b 0
+if /i "%~2"=="elevated" goto :AdminFailed
+echo Requesting Administrator rights, the script continues in a new window...
+set "SELF=%~1"
+powershell -NoProfile -Command "Start-Process -FilePath '%SELF:'=''%' -ArgumentList 'elevated' -Verb RunAs" >nul 2>&1
+if errorlevel 1 goto :AdminFailed
+color
+exit /b 1
+:AdminFailed
+echo.
+echo [ERROR] Administrator rights are required and were not granted.
+echo Right click the file and choose "Run as administrator".
+echo.
+pause
+color
+exit /b 1
 
 :InitContext
 REM Sets STAMP (yyyy-MM-dd_HH-mm-ss) and OUTDIR (Desktop, or the script

@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+- Both scripts ask for Administrator rights and restart elevated when started without them, instead of just exiting
+- `extract_logs.bat`: `HOURS` setting for the time window of the `.txt` extracts (no more editing the millisecond value in `:EventText`)
+- `extract_logs.bat`: `FULL_DUMP` setting (`ask` / `yes` / `no`) for `MEMORY.DMP`; with `ask` the size is shown and the choice is made before the long steps start, and the copy is skipped if it would leave less than 1 GB free
+- `extract_logs.bat`: new outputs: Setup log (`.txt` + `.evtx`), Live Kernel Reports, Windows Error Reporting reports, `ipconfig /all`, installed updates, disk health
+- `extract_logs.bat`: each result line names its item, and the final screen shows how many items failed
+- `.gitattributes` keeps Windows line endings in the `.bat` files, which `cmd.exe` needs to find labels reliably
+
+### Changed
+- The Administrator check uses `fltmc` instead of `net session`, which fails on systems where the Server service is disabled
+
 ## [2.2.1] — 2026-09-29
 
 ### Fixed
