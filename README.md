@@ -8,8 +8,8 @@
 
 Two batch scripts to preserve Windows diagnostic data before you start troubleshooting, and to clear Event Viewer history afterwards:
 
-- 🔎 **`extract_logs.bat`** — collects event logs, crash dumps, driver list and system info into a timestamped folder
-- 🧹 **`clean_logs.bat`** — clears Windows Event Viewer logs, with an optional report
+- 🔎 **`extract_logs.bat`**: collects event logs, crash dumps, driver list and system info into a timestamped folder
+- 🧹 **`clean_logs.bat`**: clears Windows Event Viewer logs, with an optional report
 
 > [!WARNING]
 > `clean_logs.bat` permanently erases Event Viewer history. Run `extract_logs.bat` first if you might need those logs.
@@ -17,7 +17,7 @@ Two batch scripts to preserve Windows diagnostic data before you start troublesh
 ## Quick start
 
 1. Download the latest version from the [Releases page](https://github.com/lorenzocaputodev/windows-log-toolkit/releases/latest), or clone the repository.
-2. Double click the script and accept the Windows prompt asking for Administrator rights (or right click it and choose **Run as administrator**).
+2. Double-click the script and accept the Windows prompt asking for Administrator rights (or right-click it and choose **Run as administrator**).
 3. Run `extract_logs.bat` first, check the output folder, and run `clean_logs.bat` only if you really want to clear the logs.
 
 Nothing is uploaded anywhere: both scripts only write files locally.
@@ -25,7 +25,7 @@ Nothing is uploaded anywhere: both scripts only write files locally.
 ## Requirements
 
 - Windows 10 or 11 with `cmd.exe`, `wevtutil` and PowerShell (all included by default)
-- **Administrator privileges** — if missing, both scripts ask for them and restart in a new window; if you refuse, they exit with an error message
+- **Administrator privileges**: if missing, both scripts ask for them and restart in a new window. If you refuse, they exit with an error message.
 
 ## `extract_logs.bat`
 
@@ -80,10 +80,10 @@ set "DRIVERQUERY_VERBOSE=0"
 set "FULL_DUMP=ask"
 ```
 
-- `HOURS` — time window for the `.txt` extracts and WER reports, e.g. `168` for a week. Invalid values fall back to `24`.
-- `MAX_EVENTS` — max entries per event query. Lower = faster, less history.
-- `DRIVERQUERY_VERBOSE` — `1` for full `driverquery /v` (slower; signatures, paths), `0` for the fast version.
-- `FULL_DUMP` — what to do with `MEMORY.DMP`, which can be several GB: `ask` (default) shows its size and asks before the collection starts, `yes` always copies it, `no` never does. In every case it is skipped if the output drive would be left with less than 1 GB free.
+- `HOURS`: time window for the `.txt` extracts and WER reports, e.g. `168` for a week. Invalid values fall back to `24`.
+- `MAX_EVENTS`: max entries per event query. Lower = faster, less history.
+- `DRIVERQUERY_VERBOSE`: `1` for full `driverquery /v` (slower; signatures, paths), `0` for the fast version.
+- `FULL_DUMP`: what to do with `MEMORY.DMP`, which can be several GB: `ask` (default) shows its size and asks before the collection starts, `yes` always copies it, `no` never does. In every case it is skipped if the output drive would be left with less than 1 GB free.
 
 ### Output location
 
@@ -99,8 +99,8 @@ Enumerates every Event Viewer channel with `wevtutil el` and clears it with `wev
 
 1. Confirm the warning prompt.
 2. Choose whether to save a report (`Save a report file? [Y/N]`):
-   - **Y** — saves `<Desktop>\clean_logs_report_YYYY-MM-DD_HH-mm-ss.txt` with the result of each log and a summary
-   - **N** — no file is written; the on-screen summary is still shown
+   - **Y**: saves `<Desktop>\clean_logs_report_YYYY-MM-DD_HH-mm-ss.txt` with the result of each log and a summary
+   - **N**: no file is written; the on-screen summary is still shown
 3. Read the summary at the end: logs cleaned, already empty, protected, failed, and about how much disk space was freed.
 
 Some logs may still fail to clear because they are in use or unavailable on that system. Windows also records the clearing itself (event 1102 in Security, 104 in System).

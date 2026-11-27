@@ -284,7 +284,7 @@ exit /b 1
 :AdminFailed
 echo.
 echo [ERROR] Administrator rights are required and were not granted.
-echo Right click the file and choose "Run as administrator".
+echo Right-click the file and choose "Run as administrator".
 echo.
 pause
 color

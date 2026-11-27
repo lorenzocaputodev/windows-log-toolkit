@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Changed
+- Clearer wording in the README and in a few on-screen messages ("Right-click the file…")
+
 ## [2.3.0] — 2026-11-26
 
 ### Added

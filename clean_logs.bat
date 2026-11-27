@@ -89,7 +89,7 @@ echo Report: %REPORT_INFO%
 echo.
 if %PROTCOUNT% GTR 0 echo Protected logs only allow reading, even for Administrators: this is normal.
 if %FAILCOUNT% GTR 0 (
-    echo Note: Some logs failed: they may be in use or unavailable.
+    echo Note: some logs failed. They may be in use or unavailable.
 ) else (
     echo Every log that Windows allows clearing was cleared.
 )
@@ -205,7 +205,7 @@ exit /b 1
 :AdminFailed
 echo.
 echo [ERROR] Administrator rights are required and were not granted.
-echo Right click the file and choose "Run as administrator".
+echo Right-click the file and choose "Run as administrator".
 echo.
 pause
 color
