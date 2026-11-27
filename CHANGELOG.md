@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [2.3.1] — 2026-11-27
 
 ### Changed
 - Clearer wording in the README and in a few on-screen messages ("Right-click the file…")
